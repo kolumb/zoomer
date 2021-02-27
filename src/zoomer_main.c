@@ -4,6 +4,10 @@
 #include "./zoomer_vector.h"
 #include "./zoomer_navigation.h"
 
+#define INITIAL_FL_DELTA_RADIUS 250.0f
+#define FL_DELTA_RADIUS_DECELERATION 10.0f
+// TODO: Monitor framerate is hardcoded
+#define RATE 60.0f
 
 typedef struct {
     bool is_enabled;
@@ -11,6 +15,50 @@ typedef struct {
     float radius;
     float delta_radius;
 } Flashlight;
+
+void flashlight_update(Flashlight flashlight, float dt) {
+    if (fabs(flashlight.delta_radius) > 1.0f) {
+        flashlight.radius = fmaxf(0.0f, flashlight.radius + flashlight.delta_radius * dt);
+        flashlight.delta_radius -= flashlight.delta_radius * FL_DELTA_RADIUS_DECELERATION * dt;
+    }
+
+    if (flashlight.is_enabled) {
+        flashlight.shadow = fminf(flashlight.shadow + 6.0f * dt, 0.8f);
+    } else {
+        flashlight.shadow = fmaxf(flashlight.shadow - 6.0f * dt, 0.0f);
+    }
+}
+
+void draw(Vector image_size, Camera camera, GLuint shader_program, GLuint vertex_array_object, Vector window_size, Mouse mouse, Flashlight flashlight) {
+
+    glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    glUseProgram(shader_program);
+
+    glUniform2f(glGetUniformLocation(shader_program, "cameraPos"), camera.position.x, camera.position.y);
+    glUniform1f(glGetUniformLocation(shader_program, "cameraScale"), camera.scale);
+    glUniform2f(glGetUniformLocation(shader_program, "screenshotSize"),
+                image_size.x,
+                image_size.y);
+    glUniform2f(glGetUniformLocation(shader_program, "windowSize"),
+                window_size.x,
+                window_size.y);
+    glUniform2f(glGetUniformLocation(shader_program, "cursorPos"),
+                mouse.curr.x,
+                mouse.curr.y);
+    glUniform1f(glGetUniformLocation(shader_program, "flShadow"), flashlight.shadow);
+    glUniform1f(glGetUniformLocation(shader_program, "flRadius"), flashlight.radius);
+
+    glBindVertexArray(vertex_array_object);
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+}
+
+void getCursorPosition(Mouse *mouse) {
+    GetCursorPos(&mouse->point);
+    mouse->curr.x = (float) mouse->point.x;
+    mouse->curr.y = (float) mouse->point.y;
+}
 
 const char *shader_type_as_cstr(GLenum shader_type)
 {
@@ -75,58 +123,141 @@ GLuint link_program(GLuint vertex_shader, GLuint fragment_shader)
     return program;
 }
 
-const char *vertex_shader_source = "#version 330 core\n"
-    "layout (location = 0) in vec3 aPos;\n"
-    "layout (location = 1) in vec2 aTexCoord;\n"
-    "\n"
-    "out vec3 ourColor;\n"
+const char *vertex_shader_source = "#version 130\n" // 330 core
+    "in vec3 aPos;\n"
+    "in vec2 aTexCoord;\n"
     "out vec2 TexCoord;\n"
     "\n"
+    "uniform vec2 cameraPos;\n"
+    "uniform float cameraScale;\n"
+    "uniform vec2 windowSize;\n"
+    "uniform vec2 screenshotSize;\n"
+    "uniform vec2 cursorPos;\n"
+    "\n"
+    "vec3 to_world(vec3 v) {\n"
+    "    vec2 ratio = vec2(\n"
+    "        windowSize.x / screenshotSize.x / cameraScale,\n"
+    "        windowSize.y / screenshotSize.y / cameraScale);\n"
+    "    return vec3((v.x / screenshotSize.x * 2.0 - 1.0) / ratio.x,\n"
+    "                (v.y / screenshotSize.y * 2.0 - 1.0) / ratio.y,\n"
+    "                v.z);\n"
+    "}\n"
+    "\n"
     "void main()\n"
     "{\n"
-    "   gl_Position = vec4(aPos, 1.0);\n"
-    "   TexCoord = vec2(aTexCoord.x, aTexCoord.y);\n"
+    "   gl_Position = vec4(to_world((aPos - vec3(cameraPos * vec2(1.0, -1.0), 0.0))), 1.0);\n"
+    "   TexCoord = aTexCoord;\n"
     "}\0";
-const char *fragment_shader_source = "#version 330 core\n"
-    "out vec4 FragColor;\n"
-    "\n"
-    "in vec3 ourColor;\n"
-    "in vec2 TexCoord;\n"
-    "\n"
-    "uniform sampler2D screenshot_texture;"
+
+const char *fragment_shader_source = "#version 130\n" // 330 core
+    "in mediump vec2 TexCoord;\n"
+    "out mediump vec4 color;\n"
+    "uniform sampler2D screenshot_texture;\n"
+    "uniform vec2 cursorPos;\n"
+    "uniform vec2 windowSize;\n"
+    "uniform float flShadow;\n"
+    "uniform float flRadius;\n"
+    "uniform float cameraScale;\n"
     "\n"
     "void main()\n"
     "{\n"
-    "   FragColor = texture(screenshot_texture, TexCoord);\n"
+    "   vec4 cursor = vec4(cursorPos.x, windowSize.y - cursorPos.y, 0.0, 1.0);\n"
+    "   color = mix(\n"
+    "       texture(screenshot_texture, TexCoord), vec4(0.0, 0.0, 0.0, 0.0),\n"
+    "       length(cursor - gl_FragCoord) < (flRadius * cameraScale) ? 0.0 : flShadow);\n"
     "}\n\0";
 
-void draw(Vector image_size, Camera camera, GLuint shader_program, GLuint vertex_array_object, Vector window_size, Mouse mouse, Flashlight flashlight) {
+// TODO: No way to load config from file
+Config config = { 0.01f, 1.5f, 6.0f, 4.0f };
 
-    (void) image_size;
-    (void) window_size;
-    (void) mouse;
-    (void) flashlight;
-    glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT); // || GL_DEPTH_BUFFER_BIT
-    glUseProgram(shader_program);
+// TODO: Handle user input without global variables
+Mouse mouse = {0};
+bool quitting = false;
+bool control_key = false;
+Camera camera = { .scale = 1.0f };
+Flashlight flashlight = { .is_enabled = false, .radius = 200.0f };
 
-    glUniform2f(glGetUniformLocation(shader_program, "cameraPos"), camera.position.x, camera.position.y);
-    glUniform1f(glGetUniformLocation(shader_program, "cameraScale"), camera.scale);
-    glUniform2f(glGetUniformLocation(shader_program, "screenshotSize"),
-                image_size.x,
-                image_size.y);
-    glUniform2f(glGetUniformLocation(shader_program, "window_size"),
-                window_size.x,
-                window_size.y);
-    glUniform2f(glGetUniformLocation(shader_program, "cursorPos"),
-                mouse.curr.x,
-                mouse.curr.y);
-    glUniform1f(glGetUniformLocation(shader_program, "flShadow"), flashlight.shadow);
-    glUniform1f(glGetUniformLocation(shader_program, "flRadius"), flashlight.radius);
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
+{
+    (void) window;
+    (void) scancode;
+    (void) mods;
+    if (action == GLFW_PRESS) {
+        switch (key) {
+        case GLFW_KEY_Q:
+        case GLFW_KEY_ESCAPE:
+            quitting = true;
+        break;
+        case GLFW_KEY_KP_0:
+        case GLFW_KEY_0:
+            camera.scale = 1.0f;
+            camera.delta_scale = 0.0f;
+            camera.position = (Vector){ 0.0f, 0.0f };
+            camera.velocity = (Vector){ 0.0f, 0.0f };
+        break;
+        case GLFW_KEY_F:
+            flashlight.is_enabled = !flashlight.is_enabled;
+        break;
+        case GLFW_KEY_LEFT_CONTROL:
+        case GLFW_KEY_RIGHT_CONTROL:
+            control_key = true;
+        break;
+        }
+    } else if (action == GLFW_RELEASE) {
+        if (key == GLFW_KEY_LEFT_CONTROL || key == GLFW_KEY_RIGHT_CONTROL) {
+            control_key = false;
+        }
+    }
+}
 
-    glBindVertexArray(vertex_array_object);
+void cursor_position_callback(GLFWwindow* window, double xpos, double ypos) {
+    (void) window;
+    (void) xpos;
+    (void) ypos;
 
-    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+    getCursorPosition(&mouse);
+    if (mouse.drag) {
+        Vector delta = VectorSubtract(world(camera, mouse.prev), world(camera, mouse.curr));
+        VectorAddMut(camera.position, delta);
+        // delta is the distance the mouse traveled in a single
+        // frame. To turn the velocity into units/second we need to
+        // multiple it by FPS.
+        camera.velocity = VectorScale(delta, RATE);
+    }
+}
+
+void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
+    (void) window;
+    (void) mods;
+    if (action == GLFW_PRESS) {
+        if (button == GLFW_MOUSE_BUTTON_1) {
+            mouse.prev = mouse.curr;
+            mouse.drag = true;
+            camera.velocity = (Vector){ 0.0f, 0.0f };
+        }
+    } else if (action == GLFW_RELEASE) {
+        mouse.drag = false;
+    }
+}
+
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
+    (void) window;
+    (void) xoffset;
+    if (yoffset > 0) {
+        if (control_key && flashlight.is_enabled) {
+            flashlight.delta_radius += INITIAL_FL_DELTA_RADIUS;
+        } else {
+            camera.delta_scale += config.scroll_speed;
+            camera.scale_pivot = mouse.curr;
+        }
+    } else {
+        if (control_key && flashlight.is_enabled) {
+            flashlight.delta_radius -= INITIAL_FL_DELTA_RADIUS;
+        } else {
+            camera.delta_scale -= config.scroll_speed;
+            camera.scale_pivot = mouse.curr;
+        }
+    }
 }
 
 int main(int argc, char const *argv[])
@@ -134,9 +265,12 @@ int main(int argc, char const *argv[])
     (void) argc;
     (void) argv;
 
+    // TODO: No support for non-fullscreen launch
+    // TODO: No delay support
+
     SetProcessDPIAware();
 
-    // https://stackoverflow.com/a/28248531
+    // Stolen from https://stackoverflow.com/a/28248531
     int x1, y1, x2, y2, w, h;
 
     // get screen dimensions
@@ -153,6 +287,35 @@ int main(int argc, char const *argv[])
     HBITMAP hBitmap = CreateCompatibleBitmap(hScreen, w, h);
     HGDIOBJ old_obj = SelectObject(hDC, hBitmap);
     BitBlt(hDC, 0, 0, w, h, hScreen, x1, y1, SRCCOPY);
+
+
+    BITMAP bitmap;
+    GetObject(hBitmap, sizeof(bitmap), (void *) &bitmap);
+    BITMAPINFO BMInfo = {0};
+    BMInfo.bmiHeader.biSize = sizeof(BMInfo.bmiHeader);
+    if(0 == GetDIBits(hDC, hBitmap, 0, 0, NULL, &BMInfo, DIB_RGB_COLORS))
+    {
+        printf("%s\n", "couldn't get DIBits to BMInfo");
+    }
+    BYTE* lpPixels = (BYTE*) malloc(BMInfo.bmiHeader.biSizeImage);
+    if (lpPixels == 0) {
+        printf("ERROR: Out of memory\n");
+        return 1;
+    }
+
+    BMInfo.bmiHeader.biBitCount = 32;
+    BMInfo.bmiHeader.biCompression = BI_RGB;
+    BMInfo.bmiHeader.biHeight = abs(BMInfo.bmiHeader.biHeight);
+    if(0 == GetDIBits(hDC, hBitmap, 0, BMInfo.bmiHeader.biHeight,
+              lpPixels, &BMInfo, DIB_RGB_COLORS)) {
+        printf("%s\n", "couldn't get DIBits to lpPixels");
+    }
+    if(!lpPixels) {
+        printf("%s\n", "failed to load texture from lpPixels");
+        exit(1);
+    }
+
+
 
     if (!glfwInit()) {
         fprintf(stderr, "Could not initialize GLFW!\n");
@@ -180,11 +343,11 @@ int main(int argc, char const *argv[])
     GLuint shader_program = link_program(vertex_shader, fragment_shader);
 
     float vertices[] = {
-        // positions          // texture coords
-         0.5f,  0.5f, 0.0f,   1.0f, 1.0f, // top right
-         0.5f, -0.5f, 0.0f,   1.0f, 0.0f, // bottom right
-        -0.5f, -0.5f, 0.0f,   0.0f, 0.0f, // bottom left
-        -0.5f,  0.5f, 0.0f,   0.0f, 1.0f  // top left
+        // positions                   // texture coords
+        (float) w, (float) h, 0.0f,   1.0f, 1.0f, // top right
+        (float) w, 0.0f,      0.0f,   1.0f, 0.0f, // bottom right
+        0.0f,      0.0f,      0.0f,   0.0f, 0.0f, // bottom left
+        0.0f,      (float) h, 0.0f,   0.0f, 1.0f  // top left
     };
     unsigned int indices[] = {
         0, 1, 3,  // first Triangle
@@ -220,56 +383,40 @@ int main(int argc, char const *argv[])
     glGenTextures(1, &screenshot_texture);
     glBindTexture(GL_TEXTURE_2D, screenshot_texture);
 
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
 
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-    BITMAP bitmap;
-    GetObject(hBitmap, sizeof(bitmap), (void *) &bitmap);
-    BITMAPINFO BMInfo = {0};
-    BMInfo.bmiHeader.biSize = sizeof(BMInfo.bmiHeader);
-    if(0 == GetDIBits(hDC, hBitmap, 0, 0, NULL, &BMInfo, DIB_RGB_COLORS))
-    {
-        printf("%s\n", "couldn't get DIBits to BMInfo");
-    }
-    BYTE* lpPixels = (BYTE*) malloc(BMInfo.bmiHeader.biSizeImage);
-    if (lpPixels == 0) {
-        printf("ERROR: Out of memory\n");
-        return 1;
-    }
-
-    BMInfo.bmiHeader.biBitCount = 32;
-    BMInfo.bmiHeader.biCompression = BI_RGB;
-    BMInfo.bmiHeader.biHeight = abs(BMInfo.bmiHeader.biHeight);
-    if(0 == GetDIBits(hDC, hBitmap, 0, BMInfo.bmiHeader.biHeight,
-              lpPixels, &BMInfo, DIB_RGB_COLORS)) {
-        printf("%s\n", "couldn't get DIBits to lpPixels");
-    }
-    if (lpPixels) {
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, w, h, 0, GL_BGRA, GL_UNSIGNED_BYTE, lpPixels);
-        glGenerateMipmap(GL_TEXTURE_2D);
-        free(lpPixels);
-    } else {
-        printf("%s\n", "failed to load texture from lpPixels");
-
-    }
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, w, h, 0, GL_BGRA, GL_UNSIGNED_BYTE, lpPixels);
+    glGenerateMipmap(GL_TEXTURE_2D);
+    free(lpPixels);
 
     glUseProgram(shader_program);
-
-    Camera camera = {0};
-    Mouse mouse = {0};
-    Flashlight flashlight = {0};
-
-
-
     glUniform1i(glGetUniformLocation(shader_program, "screenshot_texture"), 0);
+    glEnable(GL_TEXTURE_2D);
 
+
+    getCursorPosition(&mouse);
+    mouse.prev = mouse.curr;
 
     Vector image_size = {(float) w, (float) h};
     Vector window_size = {(float) w, (float) h};
-    while (!glfwWindowShouldClose(window)) {
+
+    glfwSetKeyCallback(window, key_callback);
+    glfwSetCursorPosCallback(window, cursor_position_callback);
+    glfwSetMouseButtonCallback(window, mouse_button_callback);
+    glfwSetScrollCallback(window, scroll_callback);
+
+    float dt = 1.0f / RATE;
+
+    while (!glfwWindowShouldClose(window) && !quitting) {
+        glViewport(0, 0, w, h);
+
+        camera_update(&camera, config, dt, mouse, window_size);
+        flashlight_update(flashlight, dt);
+
         draw(image_size, camera, shader_program, vertex_array_object, window_size, mouse, flashlight);
 
         glfwSwapBuffers(window);

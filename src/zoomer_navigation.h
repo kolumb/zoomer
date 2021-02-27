@@ -11,6 +11,7 @@ typedef struct {
     Vector curr;
     Vector prev;
     bool drag;
+    POINT point;
 } Mouse;
 
 typedef struct {
