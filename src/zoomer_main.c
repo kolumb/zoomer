@@ -248,7 +248,7 @@ int main(int argc, char const *argv[])
         printf("%s\n", "couldn't get DIBits to lpPixels");
     }
     if (lpPixels) {
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, lpPixels);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, w, h, 0, GL_BGRA, GL_UNSIGNED_BYTE, lpPixels);
         glGenerateMipmap(GL_TEXTURE_2D);
         free(lpPixels);
     } else {
