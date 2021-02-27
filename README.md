@@ -1,6 +1,7 @@
 # Zoomer
 
 Port of zoomer app [Boomer](https://github.com/tsoding/boomer/) that was created by [Tsoding](https://twitch.tv/tsoding).
+
 Boomer is written in Nim for Linux. Zoomer is ported to C and uses Win32 API.
 
 ## Dependencies
