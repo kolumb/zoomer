@@ -285,11 +285,13 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
         }
     }
 }
-
-int main(int argc, char const *argv[])
+INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
+    PSTR lpCmdLine, INT nCmdShow)
 {
-    (void) argc;
-    (void) argv;
+    (void) hInstance;
+    (void) hPrevInstance;
+    (void) lpCmdLine;
+    (void) nCmdShow;
 
     // TODO: No support for non-fullscreen launch
     // TODO: No delay support
