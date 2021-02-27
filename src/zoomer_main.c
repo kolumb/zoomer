@@ -16,16 +16,16 @@ typedef struct {
     float delta_radius;
 } Flashlight;
 
-void flashlight_update(Flashlight flashlight, float dt) {
-    if (fabs(flashlight.delta_radius) > 1.0f) {
-        flashlight.radius = fmaxf(0.0f, flashlight.radius + flashlight.delta_radius * dt);
-        flashlight.delta_radius -= flashlight.delta_radius * FL_DELTA_RADIUS_DECELERATION * dt;
+void flashlight_update(Flashlight *flashlight, const float dt) {
+    if (fabs(flashlight->delta_radius) > 1.0f) {
+        flashlight->radius = fmaxf(0.0f, flashlight->radius + flashlight->delta_radius * dt);
+        flashlight->delta_radius -= flashlight->delta_radius * FL_DELTA_RADIUS_DECELERATION * dt;
     }
 
-    if (flashlight.is_enabled) {
-        flashlight.shadow = fminf(flashlight.shadow + 6.0f * dt, 0.8f);
+    if (flashlight->is_enabled) {
+        flashlight->shadow = fminf(flashlight->shadow + 6.0f * dt, 0.8f);
     } else {
-        flashlight.shadow = fmaxf(flashlight.shadow - 6.0f * dt, 0.0f);
+        flashlight->shadow = fmaxf(flashlight->shadow - 6.0f * dt, 0.0f);
     }
 }
 
@@ -147,7 +147,7 @@ const char *vertex_shader_source = "#version 130\n" // 330 core
     "{\n"
     "   gl_Position = vec4(to_world((aPos - vec3(cameraPos * vec2(1.0, -1.0), 0.0))), 1.0);\n"
     "   TexCoord = aTexCoord;\n"
-    "}\0";
+    "}\n\0";
 
 const char *fragment_shader_source = "#version 130\n" // 330 core
     "in mediump vec2 TexCoord;\n"
@@ -243,7 +243,7 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
     (void) window;
     (void) xoffset;
-    if (yoffset > 0) {
+    if (yoffset < 0) {
         if (control_key && flashlight.is_enabled) {
             flashlight.delta_radius += INITIAL_FL_DELTA_RADIUS;
         } else {
@@ -415,7 +415,7 @@ int main(int argc, char const *argv[])
         glViewport(0, 0, w, h);
 
         camera_update(&camera, config, dt, mouse, window_size);
-        flashlight_update(flashlight, dt);
+        flashlight_update(&flashlight, dt);
 
         draw(image_size, camera, shader_program, vertex_array_object, window_size, mouse, flashlight);
 
