@@ -6,6 +6,7 @@
 
 #define INITIAL_FL_DELTA_RADIUS 250.0f
 #define FL_DELTA_RADIUS_DECELERATION 10.0f
+#define PAN_SPEED 20.0f
 
 
 typedef struct {
@@ -202,6 +203,22 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
             camera.delta_scale = 0.0f;
             camera.position = (Vector){ 0.0f, 0.0f };
             camera.velocity = (Vector){ 0.0f, 0.0f };
+        break;
+        case GLFW_KEY_W:
+        case GLFW_KEY_UP:
+            camera.position.y -= PAN_SPEED;
+        break;
+        case GLFW_KEY_S:
+        case GLFW_KEY_DOWN:
+            camera.position.y += PAN_SPEED;
+        break;
+        case GLFW_KEY_A:
+        case GLFW_KEY_LEFT:
+            camera.position.x -= PAN_SPEED;
+        break;
+        case GLFW_KEY_D:
+        case GLFW_KEY_RIGHT:
+            camera.position.x += PAN_SPEED;
         break;
         case GLFW_KEY_F:
             flashlight.is_enabled = !flashlight.is_enabled;
