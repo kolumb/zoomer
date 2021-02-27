@@ -32,6 +32,8 @@ Boomer is written in Nim for Linux. Zoomer is ported to C and uses Win32 API.
 | `Q` | Quit app |
 | `0` | Reset zoom |
 | `Mouse button` | Pan |
+| `+` | Zoom in |
+| `-` | Zoom out |
 | `Scroll wheel` | Zoom +/- |
 | `F` | Toggle flashlight |
 | `Ctrl` + `Scroll wheel` | Change size of flashlight |

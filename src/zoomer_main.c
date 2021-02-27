@@ -188,6 +188,14 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         case GLFW_KEY_ESCAPE:
             quitting = true;
         break;
+        case GLFW_KEY_EQUAL:
+        case GLFW_KEY_KP_ADD:
+            camera.scale *= 1.1f;
+        break;
+        case GLFW_KEY_MINUS:
+        case GLFW_KEY_KP_SUBTRACT:
+            camera.scale *= 0.90909f;
+        break;
         case GLFW_KEY_KP_0:
         case GLFW_KEY_0:
             camera.scale = 1.0f;
