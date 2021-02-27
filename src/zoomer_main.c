@@ -398,6 +398,9 @@ int main(int argc, char const *argv[])
     glEnable(GL_TEXTURE_2D);
 
 
+    GLFWcursor *cursor = glfwCreateStandardCursor(GLFW_CROSSHAIR_CURSOR);
+    glfwSetCursor(window, cursor);
+
     getCursorPosition(&mouse);
     mouse.prev = mouse.curr;
 
