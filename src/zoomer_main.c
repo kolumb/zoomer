@@ -6,8 +6,7 @@
 
 #define INITIAL_FL_DELTA_RADIUS 250.0f
 #define FL_DELTA_RADIUS_DECELERATION 10.0f
-// TODO: Monitor framerate is hardcoded
-#define RATE 60.0f
+
 
 typedef struct {
     bool is_enabled;
@@ -176,6 +175,7 @@ bool quitting = false;
 bool control_key = false;
 Camera camera = { .scale = 1.0f };
 Flashlight flashlight = { .is_enabled = false, .radius = 200.0f };
+int refreshRate = 60;
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
@@ -222,7 +222,7 @@ void cursor_position_callback(GLFWwindow* window, double xpos, double ypos) {
         // delta is the distance the mouse traveled in a single
         // frame. To turn the velocity into units/second we need to
         // multiple it by FPS.
-        camera.velocity = VectorScale(delta, RATE);
+        camera.velocity = VectorScale(delta, (float) refreshRate);
     }
 }
 
@@ -321,10 +321,16 @@ int main(int argc, char const *argv[])
         fprintf(stderr, "Could not initialize GLFW!\n");
         exit(1);
     }
-
+    GLFWmonitor* primary_monitor = glfwGetPrimaryMonitor();
+    const GLFWvidmode* mode = glfwGetVideoMode(primary_monitor);
+    glfwWindowHint(GLFW_RED_BITS, mode->redBits);
+    glfwWindowHint(GLFW_GREEN_BITS, mode->greenBits);
+    glfwWindowHint(GLFW_BLUE_BITS, mode->blueBits);
+    glfwWindowHint(GLFW_REFRESH_RATE, mode->refreshRate);
+     
     GLFWwindow *window = glfwCreateWindow(
-        w, h,
-        "Zoomer", NULL, NULL);
+        mode->width, mode->height,
+        "Zoomer", primary_monitor, NULL);
     if (window == NULL) {
         glfwTerminate();
         fprintf(stderr, "Could not create GLFW window!\n");
@@ -412,7 +418,8 @@ int main(int argc, char const *argv[])
     glfwSetMouseButtonCallback(window, mouse_button_callback);
     glfwSetScrollCallback(window, scroll_callback);
 
-    float dt = 1.0f / RATE;
+    refreshRate = mode->refreshRate;
+    float dt = 1.0f / mode->refreshRate;
 
     while (!glfwWindowShouldClose(window) && !quitting) {
         glViewport(0, 0, w, h);
