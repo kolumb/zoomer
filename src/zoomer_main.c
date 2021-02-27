@@ -249,6 +249,7 @@ void cursor_position_callback(GLFWwindow* window, double xpos, double ypos) {
         // multiple it by FPS.
         camera.velocity = VectorScale(delta, (float) refreshRate);
     }
+    mouse.prev = mouse.curr;
 }
 
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
