@@ -1,12 +1,16 @@
-#include "windows.h"
 #include <stdio.h>
-#include <math.h>
 
-#define GLEW_STATIC
-#include <GL/glew.h>
+#include "./zoomer_config.h"
+#include "./zoomer_vector.h"
+#include "./zoomer_navigation.h"
 
-#define GL_GLEXT_PROTOTYPES
-#include <GLFW/glfw3.h>
+
+typedef struct {
+    bool is_enabled;
+    float shadow;
+    float radius;
+    float delta_radius;
+} Flashlight;
 
 const char *shader_type_as_cstr(GLenum shader_type)
 {
@@ -71,7 +75,7 @@ GLuint link_program(GLuint vertex_shader, GLuint fragment_shader)
     return program;
 }
 
-const char *vertexShaderSource = "#version 330 core\n"
+const char *vertex_shader_source = "#version 330 core\n"
     "layout (location = 0) in vec3 aPos;\n"
     "layout (location = 1) in vec2 aTexCoord;\n"
     "\n"
@@ -83,18 +87,47 @@ const char *vertexShaderSource = "#version 330 core\n"
     "   gl_Position = vec4(aPos, 1.0);\n"
     "   TexCoord = vec2(aTexCoord.x, aTexCoord.y);\n"
     "}\0";
-const char *fragmentShaderSource = "#version 330 core\n"
+const char *fragment_shader_source = "#version 330 core\n"
     "out vec4 FragColor;\n"
     "\n"
     "in vec3 ourColor;\n"
     "in vec2 TexCoord;\n"
     "\n"
-    "uniform sampler2D screenshotTexture;"
+    "uniform sampler2D screenshot_texture;"
     "\n"
     "void main()\n"
     "{\n"
-    "   FragColor = texture(screenshotTexture, TexCoord);\n"
+    "   FragColor = texture(screenshot_texture, TexCoord);\n"
     "}\n\0";
+
+void draw(Vector image_size, Camera camera, GLuint shader_program, GLuint vertex_array_object, Vector window_size, Mouse mouse, Flashlight flashlight) {
+
+    (void) image_size;
+    (void) window_size;
+    (void) mouse;
+    (void) flashlight;
+    glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT); // || GL_DEPTH_BUFFER_BIT
+    glUseProgram(shader_program);
+
+    glUniform2f(glGetUniformLocation(shader_program, "cameraPos"), camera.position.x, camera.position.y);
+    glUniform1f(glGetUniformLocation(shader_program, "cameraScale"), camera.scale);
+    glUniform2f(glGetUniformLocation(shader_program, "screenshotSize"),
+                image_size.x,
+                image_size.y);
+    glUniform2f(glGetUniformLocation(shader_program, "window_size"),
+                window_size.x,
+                window_size.y);
+    glUniform2f(glGetUniformLocation(shader_program, "cursorPos"),
+                mouse.curr.x,
+                mouse.curr.y);
+    glUniform1f(glGetUniformLocation(shader_program, "flShadow"), flashlight.shadow);
+    glUniform1f(glGetUniformLocation(shader_program, "flRadius"), flashlight.radius);
+
+    glBindVertexArray(vertex_array_object);
+
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+}
 
 int main(int argc, char const *argv[])
 {
@@ -142,9 +175,9 @@ int main(int argc, char const *argv[])
         exit(1);
     }
 
-    GLuint vertexShader = compile_shader(vertexShaderSource, GL_VERTEX_SHADER);
-    GLuint fragmentShader = compile_shader(fragmentShaderSource, GL_FRAGMENT_SHADER);
-    GLuint shaderProgram = link_program(vertexShader, fragmentShader);
+    GLuint vertex_shader = compile_shader(vertex_shader_source, GL_VERTEX_SHADER);
+    GLuint fragment_shader = compile_shader(fragment_shader_source, GL_FRAGMENT_SHADER);
+    GLuint shader_program = link_program(vertex_shader, fragment_shader);
 
     float vertices[] = {
         // positions          // texture coords
@@ -157,17 +190,17 @@ int main(int argc, char const *argv[])
         0, 1, 3,  // first Triangle
         1, 2, 3   // second Triangle
     };
-    unsigned int vertexBufferObject, vertexArrayObject, elementBufferObject;
-    glGenVertexArrays(1, &vertexArrayObject);
-    glGenBuffers(1, &vertexBufferObject);
-    glGenBuffers(1, &elementBufferObject);
+    unsigned int vertex_buffer_object, vertex_array_object, element_buffer_object;
+    glGenVertexArrays(1, &vertex_array_object);
+    glGenBuffers(1, &vertex_buffer_object);
+    glGenBuffers(1, &element_buffer_object);
 
-    glBindVertexArray(vertexArrayObject);
+    glBindVertexArray(vertex_array_object);
 
-    glBindBuffer(GL_ARRAY_BUFFER, vertexBufferObject);
+    glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer_object);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, elementBufferObject);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, element_buffer_object);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
 
     // position attribute
@@ -181,12 +214,11 @@ int main(int argc, char const *argv[])
 
     glBindVertexArray(0);
 
-    glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 
-    GLuint screenshotTexture;
+    GLuint screenshot_texture;
 
-    glGenTextures(1, &screenshotTexture);
-    glBindTexture(GL_TEXTURE_2D, screenshotTexture);
+    glGenTextures(1, &screenshot_texture);
+    glBindTexture(GL_TEXTURE_2D, screenshot_texture);
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
@@ -196,23 +228,23 @@ int main(int argc, char const *argv[])
 
     BITMAP bitmap;
     GetObject(hBitmap, sizeof(bitmap), (void *) &bitmap);
-    BITMAPINFO MyBMInfo = {0};
-    MyBMInfo.bmiHeader.biSize = sizeof(MyBMInfo.bmiHeader);
-    if(0 == GetDIBits(hDC, hBitmap, 0, 0, NULL, &MyBMInfo, DIB_RGB_COLORS))
+    BITMAPINFO BMInfo = {0};
+    BMInfo.bmiHeader.biSize = sizeof(BMInfo.bmiHeader);
+    if(0 == GetDIBits(hDC, hBitmap, 0, 0, NULL, &BMInfo, DIB_RGB_COLORS))
     {
-        printf("%s\n", "couldn't get DIBits to MyBMInfo");
+        printf("%s\n", "couldn't get DIBits to BMInfo");
     }
-    BYTE* lpPixels = (BYTE*) malloc(MyBMInfo.bmiHeader.biSizeImage);
+    BYTE* lpPixels = (BYTE*) malloc(BMInfo.bmiHeader.biSizeImage);
     if (lpPixels == 0) {
         printf("ERROR: Out of memory\n");
         return 1;
     }
 
-    MyBMInfo.bmiHeader.biBitCount = 32;
-    MyBMInfo.bmiHeader.biCompression = BI_RGB;
-    MyBMInfo.bmiHeader.biHeight = abs(MyBMInfo.bmiHeader.biHeight);
-    if(0 == GetDIBits(hDC, hBitmap, 0, MyBMInfo.bmiHeader.biHeight,
-              lpPixels, &MyBMInfo, DIB_RGB_COLORS)) {
+    BMInfo.bmiHeader.biBitCount = 32;
+    BMInfo.bmiHeader.biCompression = BI_RGB;
+    BMInfo.bmiHeader.biHeight = abs(BMInfo.bmiHeader.biHeight);
+    if(0 == GetDIBits(hDC, hBitmap, 0, BMInfo.bmiHeader.biHeight,
+              lpPixels, &BMInfo, DIB_RGB_COLORS)) {
         printf("%s\n", "couldn't get DIBits to lpPixels");
     }
     if (lpPixels) {
@@ -224,24 +256,29 @@ int main(int argc, char const *argv[])
 
     }
 
-    glUseProgram(shaderProgram);
-    glUniform1i(glGetUniformLocation(shaderProgram, "screenshotTexture"), 0);
+    glUseProgram(shader_program);
 
+    Camera camera = {0};
+    Mouse mouse = {0};
+    Flashlight flashlight = {0};
+
+
+
+    glUniform1i(glGetUniformLocation(shader_program, "screenshot_texture"), 0);
+
+
+    Vector image_size = {(float) w, (float) h};
+    Vector window_size = {(float) w, (float) h};
     while (!glfwWindowShouldClose(window)) {
-        glClear(GL_COLOR_BUFFER_BIT);
-
-        glUseProgram(shaderProgram);
-        glBindVertexArray(vertexArrayObject);
-
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        draw(image_size, camera, shader_program, vertex_array_object, window_size, mouse, flashlight);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
 
     glfwTerminate();
-    glDeleteShader(vertexShader);
-    glDeleteShader(fragmentShader);
+    glDeleteShader(vertex_shader);
+    glDeleteShader(fragment_shader);
 
     SelectObject(hDC, old_obj);
     DeleteDC(hDC);
