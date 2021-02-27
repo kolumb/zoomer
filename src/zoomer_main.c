@@ -218,7 +218,7 @@ void cursor_position_callback(GLFWwindow* window, double xpos, double ypos) {
     getCursorPosition(&mouse);
     if (mouse.drag) {
         Vector delta = VectorSubtract(world(camera, mouse.prev), world(camera, mouse.curr));
-        VectorAddMut(camera.position, delta);
+        VectorAddMut(&camera.position, delta);
         // delta is the distance the mouse traveled in a single
         // frame. To turn the velocity into units/second we need to
         // multiple it by FPS.

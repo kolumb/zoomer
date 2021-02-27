@@ -14,10 +14,10 @@ Vector VectorAdd(Vector v1, Vector v2)
     return result;
 }
 
-void VectorAddMut(Vector v1, Vector v2)
+void VectorAddMut(Vector *v1, Vector v2)
 {
-    v1.x += v2.x;
-    v1.y += v2.y;
+    v1->x += v2.x;
+    v1->y += v2.y;
 }
 
 Vector VectorSubtract(Vector v1, Vector v2)
@@ -26,10 +26,10 @@ Vector VectorSubtract(Vector v1, Vector v2)
     return result;
 }
 
-void VectorSubtractMut(Vector v1, Vector v2)
+void VectorSubtractMut(Vector *v1, Vector v2)
 {
-    v1.x -= v2.x;
-    v1.y -= v2.y;
+    v1->x -= v2.x;
+    v1->y -= v2.y;
 }
 
 Vector VectorScale(Vector v, float f)
