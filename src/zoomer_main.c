@@ -168,7 +168,7 @@ const char *fragment_shader_source = "#version 130\n" // 330 core
     "}\n\0";
 
 // TODO: No way to load config from file
-Config config = { 0.01f, 1.5f, 6.0f, 4.0f };
+Config config = { .min_scale = 0.1f, .scroll_speed = 1.1f, .drag_friction = 6.0f, .scale_friction = 1.5f };
 
 // TODO: Handle user input without global variables
 Mouse mouse = {0};
@@ -191,11 +191,11 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         break;
         case GLFW_KEY_EQUAL:
         case GLFW_KEY_KP_ADD:
-            camera.scale *= 1.1f;
+            camera.scale *= config.scroll_speed;
         break;
         case GLFW_KEY_MINUS:
         case GLFW_KEY_KP_SUBTRACT:
-            camera.scale *= 0.90909f;
+            camera.scale /= config.scroll_speed;
         break;
         case GLFW_KEY_KP_0:
         case GLFW_KEY_0:
