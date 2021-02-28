@@ -168,7 +168,7 @@ const char *fragment_shader_source = "#version 130\n" // 330 core
     "}\n\0";
 
 // TODO: No way to load config from file
-Config config = { .min_scale = 0.1f, .scroll_speed = 1.1f, .drag_friction = 6.0f, .scale_friction = 1.5f };
+Config config = { .min_scale = 0.2f, .scroll_speed = 0.5f, .drag_friction = 4.0f, .scale_friction = 1.5f };
 
 // TODO: Handle user input without global variables
 Mouse mouse = {0};

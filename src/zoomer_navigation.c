@@ -6,7 +6,7 @@ Vector world (const Camera camera, const Vector pos) {
 }
 
 void camera_update(Camera *camera, const Config config, const float dt, const Mouse mouse, const Vector window_size) {
-    if (fabsf(camera->delta_scale) > 0.5f) {
+    if (fabsf(camera->delta_scale) > 0.01f) {
         Vector p0 = VectorScale(VectorSubtract(camera->scale_pivot, VectorScale(window_size, 0.5f)), 1.0f / camera->scale);
         camera->scale = fmaxf(camera->scale + camera->delta_scale * dt, config.min_scale);
         Vector p1 = VectorScale(VectorSubtract(camera->scale_pivot, VectorScale(window_size, 0.5f)), 1.0f / camera->scale);
