@@ -10,6 +10,8 @@ Boomer is written in Nim for Linux. Zoomer is ported to C and uses Win32 API.
 
 ## Build
 
+### MSVC
+
 ```console
 > # Download and setup OpenGL dependencies
 > setup_glfw.bat
@@ -23,6 +25,17 @@ Boomer is written in Nim for Linux. Zoomer is ported to C and uses Win32 API.
 
 > # Or with one command
 > build_msvc.bat -run
+```
+
+### MSYS2 (mingw-w64-x86_64)
+
+```console
+> # Download and setup OpenGL dependencies
+> pacman -S mingw-w64-x86_64-glfw mingw-w64-x86_64-glew
+
+> # Build
+> cc src/zoomer.c -o zoomer -lglfw3 -lglew32 -lopengl32 -lGdi32
+> ./zoomer.exe
 ```
 
 ## Controls
