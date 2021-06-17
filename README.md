@@ -6,7 +6,7 @@ Boomer is written in Nim for Linux. Zoomer is ported to C and uses Win32 API.
 
 ## Dependencies
 
-[Microsoft Visual Studio compiler](https://visualstudio.microsoft.com/downloads/)
+[Microsoft Visual Studio compiler](https://visualstudio.microsoft.com/downloads/) / [MSYS2](https://www.msys2.org/)
 
 ## Build
 
@@ -34,7 +34,7 @@ Boomer is written in Nim for Linux. Zoomer is ported to C and uses Win32 API.
 > pacman -S mingw-w64-x86_64-glfw mingw-w64-x86_64-glew
 
 > # Build
-> cc src/zoomer.c -o zoomer -lglfw3 -lglew32 -lopengl32 -lGdi32
+> cc src/zoomer.c -o zoomer -lglfw3 -lglew32 -lopengl32 -lGdi32 -static
 > ./zoomer.exe
 ```
 
